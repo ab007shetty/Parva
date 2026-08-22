@@ -127,11 +127,25 @@ export function isConflict(error: unknown): boolean {
  * the query being made, and the correct response to it is a short retry — a
  * real Appwrite error (a bad query, an expired key, a 404) comes back as an
  * `AppwriteException` with a status code and must never be retried here.
+ *
+ * ENOTFOUND is on the list despite normally meaning "this host does not
+ * exist", which would be pointless to retry. It earned its place: the same
+ * flaky resolver has returned it for Appwrite's endpoint — a host that
+ * plainly does exist — and then resolved that host correctly seconds later in
+ * the same shell. A misconfigured endpoint is a permanent ENOTFOUND that
+ * costs two extra attempts before surfacing, which is a far better trade than
+ * a working endpoint failing a request outright.
  */
 function isTransientNetworkError(error: unknown): boolean {
   if (!(error instanceof TypeError) || error.message !== 'fetch failed') return false;
   const code = (error.cause as { code?: string } | undefined)?.code;
-  return code === 'EAI_AGAIN' || code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'ECONNREFUSED';
+  return (
+    code === 'EAI_AGAIN' ||
+    code === 'ENOTFOUND' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNREFUSED'
+  );
 }
 
 /**

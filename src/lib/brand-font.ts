@@ -18,11 +18,16 @@ import path from 'node:path';
  * as pdf.js's own font fallback (see scripts/copy-pdf-assets.mjs) — so the
  * mark costs nothing extra to ship. It is guaranteed to exist by the time any
  * of these routes run, in dev and on Vercel alike, because npm's postinstall
- * hook writes it before `next dev` or `next build` ever starts. Read from
- * `public/` rather than `node_modules/pdfjs-dist` directly: files under
- * `public/` are always deployed as-is, where a path built at runtime by
- * string concatenation into `node_modules` is exactly the shape of reference
- * Next's serverless bundler tends not to trace.
+ * hook writes it before `next dev` or `next build` ever starts.
+ *
+ * The path is assembled at runtime, which looks like the shape of reference
+ * Next's serverless bundler cannot follow — but it does follow this one, and
+ * that was verified rather than assumed: a build with and without an explicit
+ * `outputFileTracingIncludes` entry for this file produces byte-identical
+ * route traces, both containing the font. `path.join(process.cwd(), <literal>)`
+ * keeps the filename statically analysable, which is all the tracer needs. Keep
+ * the literal literal — interpolating any part of it is what would break the
+ * trace and ship these routes without their font.
  */
 
 export const BRAND_FONT_FAMILY = 'Parva Brand Bold';

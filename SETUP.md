@@ -128,6 +128,11 @@ why covers share it rather than getting their own. Set
 `APPWRITE_COVERS_BUCKET_ID` to a different id on a plan with room, and setup will
 create a separate one.
 
+Note that on a project which already holds books, setting that variable is not
+enough on its own: the existing cover files are physically in the books bucket,
+so the app would start looking for them somewhere they are not. Splitting an
+existing install means moving those files too.
+
 Free plans are also capped at **one database**. If your project already has one,
 setup adopts it instead of failing — Parva's tables are namespaced by their own
 ids and sit alongside anything else in there.

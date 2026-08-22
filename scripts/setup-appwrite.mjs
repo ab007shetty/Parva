@@ -140,6 +140,10 @@ const isRateLimited = (error) => error?.code === 429;
 /** Appwrite says this when the plan's quota for a resource is used up. */
 const isPlanLimit = (error) =>
   error?.type === 'general_usage_exceeded' ||
+  // What Appwrite Cloud actually returns today for an over-quota bucket or
+  // database — verified against a live free-plan project. The prose match
+  // below already caught it, but only for as long as the wording holds.
+  error?.type === 'additional_resource_not_allowed' ||
   /maximum number of|plan has reached|upgrade to increase/i.test(String(error?.message ?? ''));
 
 /** Appwrite rate-limits schema writes; a short pause keeps a long run from
