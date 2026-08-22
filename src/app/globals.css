@@ -1,0 +1,513 @@
+@import 'tailwindcss';
+
+/* ═══════════════════════════════════════════════════════════════════
+   PARVA — design tokens
+
+   Thesis: a white-cube gallery for books. The ground is perfect white
+   and the chrome is strictly monochrome, so the covers supply all the
+   colour. The only two non-neutral tokens are *material* rather than
+   brand: --color-ribbon is a silk bookmark, --color-marker is a
+   highlighter. Each is used for exactly one job, nowhere else.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* ── Ground & ink ─────────────────────────────────────────── */
+  --color-paper: #ffffff;
+  --color-ink: #0a0a0a;
+  --color-ink-soft: #2e2e2e;
+  --color-graphite: #767676;
+  --color-mute: #a3a3a3;
+  --color-faint: #cfcfcf;
+
+  /* ── Structure ────────────────────────────────────────────── */
+  --color-rule: #e9e9e9;
+  --color-rule-soft: #f2f2f2;
+  --color-wash: #f6f6f6;
+  --color-wash-deep: #efefef;
+
+  /* ── Material accents. One job each. ──────────────────────── */
+  --color-ribbon: #c1121f; /* bookmarks only */
+  --color-marker: #ffe585; /* highlights + search hits only */
+  --color-marker-deep: #f5c518;
+
+  /* ── Type ─────────────────────────────────────────────────── */
+  --font-display: var(--font-fraunces), Iowan Old Style, Georgia, serif;
+  --font-ui: var(--font-archivo), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Reading faces — only loaded on /read routes */
+  --font-read-serif: var(--font-newsreader), Georgia, serif;
+  --font-read-literary: var(--font-literata), Georgia, serif;
+  --font-read-clear: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Motion ───────────────────────────────────────────────── */
+  --ease-shelf: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-page: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-lift: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* ── Book-object geometry ─────────────────────────────────── */
+  --spine-width: 4px;
+  --book-radius: 2px;
+
+  /* ── Layout ───────────────────────────────────────────────── */
+  --shell-max: 96rem;
+}
+
+/* --bloom is the dominant colour of whatever book is in context. Set at
+   runtime on the book element or <html> in the reader. Neutral by default
+   so nothing tints until a real cover has been sampled. */
+:root {
+  --bloom: #767676;
+
+  /* The gutter grows to clear a display cutout. Both sides get the larger of
+     the two insets rather than each getting its own, because a page whose left
+     margin is 44px and right margin 20px reads as broken, not as adaptive.
+     In portrait, and on every device without a cutout, both insets are zero
+     and this is exactly the clamp it was before.
+     Requires viewport-fit=cover — see the viewport export in app/layout.tsx. */
+  --gutter-base: clamp(1.25rem, 5vw, 5rem);
+  --page-gutter: calc(
+    var(--gutter-base) + max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px))
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    /* Lenis drives scrolling; native smooth-scroll would fight it. */
+    scroll-behavior: auto;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* A hard floor against page-level horizontal scroll: no fixed banner, toast
+       or long unbroken string (a filename, a book title) can ever widen the
+       document past the viewport, on any screen size. Lenis only reads
+       overflow-y for its own stop/start logic, so this is inert to it.
+       Elements that mean to scroll sideways — the book shelves — carry their
+       own overflow-x: auto and are unaffected; this only clips the viewport
+       itself. */
+    overflow-x: hidden;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-ui);
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
+  }
+
+  /* Lenis flags the html element while it is driving. */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  .lenis.lenis-stopped {
+    overflow: clip;
+  }
+
+  ::selection {
+    background: var(--color-marker);
+    color: var(--color-ink);
+  }
+
+  /* One focus treatment for the whole app: a square ink ring, offset so it
+     reads as a drawn box rather than a glow. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    border-radius: 1px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  button,
+  [role='button'] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  /* Numbers should never wobble in tables, page counts or scrubbers. */
+  input[type='number'],
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  /* Scrollbars: hairline, ink, no chrome. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-faint) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-faint);
+    border: 3px solid var(--color-paper);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-mute);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Type roles
+
+   Fraunces carries the personality — WONK on, SOFT off, so it stays
+   sharp rather than friendly, and optical sizing tracks the real size.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@utility display {
+  font-family: var(--font-display);
+  font-variation-settings: 'SOFT' 0, 'WONK' 1;
+  font-weight: 400;
+  letter-spacing: -0.028em;
+  line-height: 0.95;
+}
+
+@utility display-tight {
+  font-family: var(--font-display);
+  font-variation-settings: 'SOFT' 0, 'WONK' 1;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 0.9;
+}
+
+/* The small uppercase label that carries structure throughout the app:
+   eyebrows, table headers, panel titles, metadata keys. */
+@utility label {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--color-graphite);
+}
+
+@utility label-ink {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--color-ink);
+}
+
+@utility prose-read {
+  font-family: var(--font-read-serif);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--color-ink-soft);
+  letter-spacing: -0.003em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   The book object — the signature element
+
+   A book is a physical thing sitting on a white wall: a darkened spine
+   down the left edge, stacked page-edges on the right, and a contact
+   shadow that grows as it lifts. Everything else in the UI is flat so
+   this reads as the only object with mass.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@utility book-object {
+  position: relative;
+  border-radius: var(--book-radius);
+  background: var(--color-wash);
+  transform-style: preserve-3d;
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.04),
+    0 2px 6px rgb(0 0 0 / 0.06),
+    0 8px 18px -6px rgb(0 0 0 / 0.1);
+  transition:
+    box-shadow 420ms var(--ease-shelf),
+    transform 420ms var(--ease-shelf);
+}
+
+/* Spine: a gradient down the binding edge, plus the crease highlight a
+   real spine catches. */
+@utility book-spine {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--spine-width);
+  border-start-start-radius: var(--book-radius);
+  border-end-start-radius: var(--book-radius);
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0.28) 0%,
+    rgb(0 0 0 / 0.1) 34%,
+    rgb(0 0 0 / 0.02) 62%,
+    rgb(255 255 255 / 0.16) 88%,
+    rgb(0 0 0 / 0.06) 100%
+  );
+  pointer-events: none;
+}
+
+/* Page edges: the stack of paper you see on the fore-edge. */
+@utility book-edges {
+  position: absolute;
+  inset-block: 2%;
+  inset-inline-end: -3px;
+  width: 3px;
+  border-radius: 0 1px 1px 0;
+  background: repeating-linear-gradient(
+    90deg,
+    #ffffff 0 1px,
+    #dedede 1px 2px
+  );
+  box-shadow: 1px 0 1px rgb(0 0 0 / 0.08);
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Reader surfaces
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* The gutter shadow is what turns two pages into one bound book. */
+@utility book-gutter {
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0) 0%,
+    rgb(0 0 0 / 0.035) 26%,
+    rgb(0 0 0 / 0.11) 47%,
+    rgb(0 0 0 / 0.14) 50%,
+    rgb(0 0 0 / 0.11) 53%,
+    rgb(0 0 0 / 0.035) 74%,
+    rgb(0 0 0 / 0) 100%
+  );
+  pointer-events: none;
+}
+
+@utility page-sheet {
+  background: var(--color-paper);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.05),
+    0 2px 10px -2px rgb(0 0 0 / 0.07),
+    0 18px 40px -20px rgb(0 0 0 / 0.16);
+}
+
+/* The line a row of books sits on. An element rather than a border, because it
+   is drawn between blocks that own no shared edge — a page header and the grid
+   beneath it — where a border would have to belong to one of them. */
+@utility shelf-rule {
+  height: 1px;
+  background: var(--color-rule);
+}
+
+/* Insets for chrome pinned to an edge. A reader's bottom bar sitting under an
+   iPhone's home indicator is not a cosmetic problem — it is a control nobody
+   can press.
+   
+   These own that side's padding outright rather than adding to a py-* class,
+   because two utilities setting the same property would settle it by source
+   order — and the loser silently does nothing. Set the element's own padding
+   through the variable: `safe-b [--safe-pad-b:0.625rem]`. */
+@utility safe-t {
+  padding-top: calc(var(--safe-pad-t, 0px) + env(safe-area-inset-top, 0px));
+}
+@utility safe-b {
+  padding-bottom: calc(var(--safe-pad-b, 0px) + env(safe-area-inset-bottom, 0px));
+}
+
+@utility hairline-t {
+  border-top: 1px solid var(--color-rule);
+}
+@utility hairline-b {
+  border-bottom: 1px solid var(--color-rule);
+}
+
+/* Underline that grows from the left on hover — used on every text link
+   so links read as one system. */
+@utility link-rule {
+  position: relative;
+  text-decoration: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   pdf.js text layer
+
+   pdf.js paints invisible, precisely-positioned glyphs over the canvas so
+   selection, search and read-aloud work. These rules are required for the
+   alignment to hold; the classes are pdf.js's own contract.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.pdf-text-layer {
+  --scale-factor: 1;
+  --total-scale-factor: 1;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-align: initial;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+  caret-color: var(--color-ink);
+}
+
+.pdf-text-layer :is(span, br) {
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  color: transparent;
+}
+
+.pdf-text-layer span[role='img'] {
+  user-select: none;
+  cursor: default;
+}
+
+.pdf-text-layer ::selection {
+  background: rgb(255 229 133 / 0.6);
+  color: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   epub.js viewport
+   ═══════════════════════════════════════════════════════════════════ */
+
+.epub-view iframe {
+  border: 0;
+  display: block;
+}
+
+/* epub.js injects its own container; keep it from adding scrollbars. */
+.epub-host > div {
+  overflow: hidden !important;
+}
+
+@layer utilities {
+  .link-rule::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 320ms var(--ease-shelf);
+  }
+  .link-rule:hover::after,
+  .link-rule:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  /* Hides scrollbars on horizontal shelves without losing wheel/touch. */
+  .no-bar {
+    scrollbar-width: none;
+  }
+  .no-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ink-fill {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  /* A whisper of tooth. On pure white, large empty areas otherwise look
+     dead rather than deliberate. */
+  .tooth::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image: radial-gradient(rgb(0 0 0 / 0.035) 0.5px, transparent 0.5px);
+    background-size: 3px 3px;
+  }
+
+  /* Applied by the shelf-draw load sequence before GSAP takes over, so
+     nothing flashes at full opacity on first paint. */
+  .will-reveal {
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Reduced motion — honoured here and in GSAP (see lib/motion/context.ts)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .will-reveal {
+    opacity: 1 !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Touch
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* A 32px icon button is right under a mouse and too small under a thumb. The
+   visual box stays as drawn — growing it would loosen every toolbar in the app
+   and the reader's top bar would no longer fit on a phone — while the hit area
+   alone expands to the 44px a finger needs, centred on the icon. */
+@media (pointer: coarse) {
+  .touch-target::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

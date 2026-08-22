@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "functions": {
+    "src/app/api/book-file/[id]/route.ts": { "maxDuration": 60 },
+    "src/app/api/book-stream/[id]/route.ts": { "maxDuration": 60 },
+    "src/app/api/admin/upload/route.ts": { "maxDuration": 60 },
+    "src/app/api/admin/books/route.ts": { "maxDuration": 60 }
+  }
+}
