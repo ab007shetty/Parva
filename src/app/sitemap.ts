@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { SITE_URL } from '@/lib/config';
-import { getFacets, getSearchIndex } from '@/lib/appwrite/books';
+import { getCachedFacets, getCachedSearchIndex } from '@/lib/appwrite/catalogue-cache';
 import { withRetry } from '@/lib/appwrite/server';
 
 export const revalidate = 3600;
@@ -37,7 +37,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // crawlers for an hour, so it is worth waiting out a bad network window
     // rather than publishing a confidently empty index.
     const [books, facets] = await withRetry(
-      () => Promise.all([getSearchIndex(), getFacets()]),
+      () => Promise.all([getCachedSearchIndex(), getCachedFacets()]),
       4,
     );
 

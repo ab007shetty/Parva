@@ -1,23 +1,29 @@
-import { getFeaturedBook, getPopularBooks, getRecentBooks } from '@/lib/appwrite/books';
+import {
+  getCachedFeaturedBook,
+  getCachedPopularBooks,
+  getCachedRecentBooks,
+} from '@/lib/appwrite/catalogue-cache';
 import { getSessionUser } from '@/lib/auth/session';
 import { getContinueReading } from '@/lib/reader/continue-reading';
 import { Shelf } from '@/components/books/shelf';
 import { Hero } from '@/components/home/hero';
 import { EmptyLibrary } from '@/components/home/empty-library';
 
-// The catalogue changes when an admin publishes, not on a timer. Revalidating
-// every few minutes keeps the shelf fresh without a request per visitor, and
-// the admin routes revalidate this path directly on publish.
-export const revalidate = 300;
+// No `revalidate` here on purpose: this page reads the session cookie, which
+// opts it out of prerendering entirely, so a route-level revalidate would be
+// dead code. The caching that actually matters lives in catalogue-cache.ts,
+// around the reads that are the same for everyone.
 
 export default async function HomePage() {
   const user = await getSessionUser();
 
   // Independent reads, so they go in parallel rather than in sequence.
+  // The first three are the same for every visitor and come from the shared
+  // catalogue cache; only continue-reading is per-reader and uncached.
   const [featured, recent, popular, continuing] = await Promise.all([
-    getFeaturedBook(),
-    getRecentBooks(14),
-    getPopularBooks(14),
+    getCachedFeaturedBook(),
+    getCachedRecentBooks(14),
+    getCachedPopularBooks(14),
     getContinueReading(user),
   ]);
 

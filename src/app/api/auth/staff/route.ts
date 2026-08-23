@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
 import { createAdminClient } from '@/lib/appwrite/server';
 import { setSessionCookie, toSessionUser, upsertUserProfile } from '@/lib/auth/session';
 
@@ -7,10 +9,14 @@ import { setSessionCookie, toSessionUser, upsertUserProfile } from '@/lib/auth/s
  * Email + password sign-in, for administrators only.
  *
  * There is no sign-up route anywhere in this app: reader accounts are created
- * implicitly by Google, and admin accounts are created by an existing admin
- * with `npm run make-admin`. That is the whole account model.
+ * implicitly by Google, and admin rights come from an `admin` label set on the
+ * Appwrite account in the console — server-side only, so nobody can grant it to
+ * themselves. That is the whole account model.
  */
 export async function POST(request: Request) {
+  const limited = rateLimitGuard('staff-signin', request, RATE.staffSignIn);
+  if (limited) return limited;
+
   let email: string;
   let password: string;
 

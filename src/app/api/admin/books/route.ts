@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { ID, Permission, Query, Role } from 'node-appwrite';
 
 import { requireAdmin } from '@/lib/auth/session';
@@ -7,6 +7,7 @@ import { createAdminClient, isConflict } from '@/lib/appwrite/server';
 import { DB_ID, TABLES } from '@/lib/config';
 import { deleteStoredFile } from '@/lib/appwrite/files';
 import { demoteOtherFeatured } from '@/lib/appwrite/books';
+import { CATALOGUE_TAG } from '@/lib/appwrite/catalogue-cache';
 import { BUCKETS } from '@/lib/config';
 import { clamp, normalizeHex, slugify, uniqueSlug } from '@/lib/utils';
 import type { BookRow } from '@/types';
@@ -146,6 +147,10 @@ export async function POST(request: Request) {
 
     // The catalogue is cached, so publishing has to invalidate it or the new
     // book will not appear for minutes.
+    // 'max' is the documented profile: the tag is marked stale and refreshed
+    // behind the next visit. updateTag() would be read-your-own-writes, but it
+    // is Server-Action-only and this is a Route Handler.
+    revalidateTag(CATALOGUE_TAG, 'max');
     revalidatePath('/');
     revalidatePath('/library');
     revalidatePath(`/book/${slug}`);

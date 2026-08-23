@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
-import { browseBooks, getFacets } from '@/lib/appwrite/books';
+import { browseBooks } from '@/lib/appwrite/books';
+import { getCachedFacets } from '@/lib/appwrite/catalogue-cache';
 import { getContinueReading } from '@/lib/reader/continue-reading';
 import { getSessionUser } from '@/lib/auth/session';
 import { LIMITS, SITE_URL, SORTS, languageLabel } from '@/lib/config';
@@ -112,7 +113,9 @@ export default async function LibraryPage({ searchParams }: { searchParams: Sear
 
   const [result, facets, continuing] = await Promise.all([
     browseBooks(params),
-    getFacets(),
+    // Facet counts are catalogue-wide, so they are shared rather than
+    // recomputed per filter combination.
+    getCachedFacets(),
     getContinueReading(user, 40),
   ]);
 

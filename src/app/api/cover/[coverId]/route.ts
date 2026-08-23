@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
 import { coverOriginalRequest, coverPreviewRequest } from '@/lib/appwrite/files';
 import { clamp } from '@/lib/utils';
 
@@ -32,6 +34,9 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ coverId: string }> },
 ) {
+  const limited = rateLimitGuard('cover', request, RATE.cover);
+  if (limited) return limited;
+
   const { coverId } = await params;
 
   // Appwrite ids are alphanumeric with _ and -; refuse anything else rather

@@ -59,9 +59,9 @@ export const metadata: Metadata = {
   },
   twitter: { card: 'summary_large_image', title: APP_NAME, description: APP_DESCRIPTION },
   // No `icons` block on purpose. `app/icon.tsx`, `app/apple-icon.tsx` and the
-  // static `app/favicon.ico` generate the marks, and Next emits the correct
-  // tags for them from the file convention — naming files here that do not
-  // exist would only add 404s.
+  // static `app/favicon.ico` produce the marks, and Next emits the correct tags
+  // for them from the file convention — naming files here that do not exist
+  // would only add 404s.
   alternates: { canonical: SITE_URL },
   robots: { index: true, follow: true },
 };

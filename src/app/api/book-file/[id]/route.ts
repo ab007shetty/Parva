@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
 import { getPublishedBook } from '@/lib/appwrite/books';
 import { signBookDownload, signBookFile } from '@/lib/appwrite/files';
 
@@ -18,6 +20,9 @@ import { signBookDownload, signBookFile } from '@/lib/appwrite/files';
  * administrator allowed downloads for that book.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = rateLimitGuard('book-file', request, RATE.bookFile);
+  if (limited) return limited;
+
   const { id } = await params;
   const wantsDownload = new URL(request.url).searchParams.get('download') === '1';
 

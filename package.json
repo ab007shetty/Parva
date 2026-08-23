@@ -13,9 +13,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/copy-pdf-assets.mjs",
-    "setup": "node scripts/setup-appwrite.mjs",
-    "make-admin": "node scripts/make-admin.mjs",
-    "favicon": "node scripts/generate-favicon.mjs"
+    "setup": "node scripts/setup-appwrite.mjs"
   },
   "dependencies": {
     "@gsap/react": "2.1.2",

@@ -9,10 +9,9 @@ export const contentType = 'image/png';
 
 /**
  * The card a shared link shows — Slack, WhatsApp, iMessage, and the preview
- * some search results grow. There was no OG image at all before this, which
- * social platforms render as a blank grey rectangle; the same drawn mark that
- * is the favicon carries it instead, so a shared link looks like it belongs
- * to the app rather than to nothing in particular.
+ * some search results grow. Without one, social platforms render a blank grey
+ * rectangle; the same drawn mark that is the favicon carries it instead, so a
+ * shared link looks like it belongs to the app rather than to nothing.
  */
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -30,14 +29,7 @@ export default function OpengraphImage() {
         }}
       >
         <BrandMark size={168} />
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 14,
-          }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
           <div
             style={{
               fontSize: 88,

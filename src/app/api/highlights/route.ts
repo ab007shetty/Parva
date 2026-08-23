@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
 import { getSessionUser } from '@/lib/auth/session';
 import { addHighlight, listHighlights } from '@/lib/appwrite/reader-data';
 import { clamp } from '@/lib/utils';
@@ -23,6 +25,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = rateLimitGuard('highlights', request, RATE.readerWrite);
+  if (limited) return limited;
+
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Sign in to keep highlights.' }, { status: 401 });
 

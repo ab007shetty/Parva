@@ -14,7 +14,6 @@ pdf.js directly; EPUB is epub.js. Motion is GSAP with Lenis.
 npm install
 # fill in the four blanks in .env — see SETUP.md
 npm run setup                # provisions Appwrite
-npm run make-admin -- you@example.com "Your Name"
 npm run dev
 ```
 
@@ -144,9 +143,7 @@ src/
     admin/               upload and metadata extraction
 scripts/
   setup-appwrite.mjs     provisions everything, idempotent
-  make-admin.mjs         creates or promotes an administrator
   copy-pdf-assets.mjs    copies pdf.js worker + wasm to public/ on install
-  generate-favicon.mjs   redraws favicon.ico from the same mark as app/icon.tsx
 ```
 
 ### Decisions worth knowing about
@@ -204,9 +201,6 @@ reader viewport are marked `data-lenis-prevent`.
 | `npm run typecheck`                            | `tsc --noEmit`                                   |
 | `npm run lint`                                 | ESLint, including the React Compiler rules       |
 | `npm run setup`                                | Provision Appwrite. Safe to re-run.              |
-| `npm run make-admin -- email "Name"`           | Create or promote an administrator               |
-| `npm run make-admin -- email --demote`         | Remove admin rights                              |
-| `npm run favicon`                              | Regenerate favicon.ico after changing the brand mark |
 
 ---
 

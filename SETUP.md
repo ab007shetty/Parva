@@ -1,27 +1,12 @@
 # Setting up Parva
 
-Start to finish, this takes about fifteen minutes. Ten of them are Google's
-OAuth screen.
-
-There are four things to do:
-
-1. [Create an Appwrite project](#1-appwrite-project)
-2. [Run the setup script](#2-run-the-setup-script)
-3. [Enable Google sign-in](#3-google-sign-in)
-4. [Make yourself an administrator](#4-make-yourself-an-administrator)
-
----
-
-## Before you start
-
-- **Node 20.9 or newer.** Check with `node -v`.
-- **An Appwrite project.** Either [Appwrite Cloud](https://cloud.appwrite.io)
-  (free tier is enough to run this) or a self-hosted instance on 1.8 or newer.
-  The app uses Appwrite's TablesDB API, which arrived in 1.8.
+About fifteen minutes, and ten of those are Google's OAuth screen. You need
+**Node 20.9+** and an **Appwrite** project — [Cloud](https://cloud.appwrite.io)
+free tier is enough, or self-hosted on 1.8 or newer (the app uses TablesDB,
+which arrived in 1.8).
 
 ```bash
-cd parva
-npm install
+npm install     # also copies the pdf.js worker into public/pdfjs
 ```
 
 ---
@@ -30,44 +15,40 @@ npm install
 
 In the Appwrite console:
 
-1. **Create a project.** Any name.
+**Create a project**, then copy the **endpoint** and **project ID** from
+**Settings**. Cloud endpoints are region-specific — read the value rather than
+assuming (`https://fra.cloud.appwrite.io/v1`, `https://sgp.cloud.appwrite.io/v1`,
+…).
 
-2. **Copy the endpoint and project ID.** Both are on **Settings** for the
-   project. Appwrite Cloud endpoints are region-specific, so read the value
-   rather than assuming — it looks like `https://fra.cloud.appwrite.io/v1` or
-   `https://nyc.cloud.appwrite.io/v1`. Self-hosted is
-   `https://your-domain.com/v1`.
+**Create an API key** at **Overview → Integrations → API keys**, with these
+scopes:
 
-3. **Create an API key.** **Overview → Integrations → API keys → Create API
-   key**. Give it these scopes:
+| Group     | Scopes                                                     |
+| --------- | ---------------------------------------------------------- |
+| Databases | `databases.read` `databases.write`                         |
+| Tables    | `tables.read` `tables.write`                               |
+| Columns   | `columns.read` `columns.write`                             |
+| Indexes   | `indexes.read` `indexes.write`                             |
+| Rows      | `rows.read` `rows.write`                                   |
+| Storage   | `buckets.read` `buckets.write` `files.read` `files.write`   |
+| Auth      | `users.read` `users.write` `sessions.write` `targets.read`  |
+| Tokens    | `tokens.write` — optional, see below                       |
 
-   | Group     | Scopes                                                    |
-   | --------- | --------------------------------------------------------- |
-   | Databases | `databases.read` `databases.write`                        |
-   | Tables    | `tables.read` `tables.write`                              |
-   | Columns   | `columns.read` `columns.write`                            |
-   | Indexes   | `indexes.read` `indexes.write`                            |
-   | Rows      | `rows.read` `rows.write`                                  |
-   | Storage   | `buckets.read` `buckets.write` `files.read` `files.write`  |
-   | Tokens    | `tokens.write` — optional, see below                      |
-   | Auth      | `users.read` `users.write` `sessions.write` `targets.read` |
+Copy the secret when shown; Appwrite will not show it again. `columns.write` and
+`indexes.write` are the two people usually miss.
 
-   Copy the secret when it is shown. Appwrite will not show it again.
+> **`tokens.write` is worth adding.** With it, a reader's browser streams a book
+> straight from Appwrite and none of that traffic touches your app. Without it,
+> Parva relays the bytes through `/api/book-stream` — identical for the reader,
+> byte-range requests included, but the traffic goes through your hosting.
+> Nothing breaks either way; the app detects which it has.
 
-   **`tokens.write` is worth adding.** With it, a reader's browser streams a
-   book straight from Appwrite and none of the traffic touches your app. Without
-   it, Parva relays the bytes through `/api/book-stream` instead — identical
-   behaviour for the reader, including the byte-range requests that let a large
-   scan open on its first page, but the traffic passes through your own hosting.
-   Nothing breaks either way; the app detects which it has and says so in the
-   dev server log.
+**Add a Web platform** at **Overview → Platforms → Add platform → Web**. Add
+`localhost` now and your production hostname when you deploy. Appwrite blocks
+browser requests and OAuth redirects from hostnames that are not registered
+here, and this is the single most common reason sign-in or uploads fail.
 
-4. **Add a Web platform.** **Settings → Platforms → Add platform → Web**. Add
-   `localhost` now, and your production hostname when you deploy. Appwrite
-   refuses OAuth redirects to hostnames that are not registered here, so
-   forgetting this is the most common reason sign-in fails.
-
-Now fill in the blanks in `.env`:
+Now fill in `.env`:
 
 ```ini
 NEXT_PUBLIC_APPWRITE_ENDPOINT=https://fra.cloud.appwrite.io/v1
@@ -76,274 +57,219 @@ APPWRITE_API_KEY=your-api-key-secret
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-Leave the `APPWRITE_DATABASE_ID` and bucket variables as they are — the setup
-script uses exactly those names, and leaves `APPWRITE_COVERS_BUCKET_ID` blank on
-purpose (see below).
+Leave `APPWRITE_DATABASE_ID`, `APPWRITE_BOOKS_BUCKET_ID` and
+`NEXT_PUBLIC_MAX_BOOK_MB` as they ship, and leave `APPWRITE_COVERS_BUCKET_ID`
+blank — the free plan allows one bucket, so covers share the books bucket and
+are served through `/api/cover/[id]`.
 
 ---
 
-## 2. Run the setup script
+## 2. Provision it
 
 ```bash
 npm run setup
 ```
 
-This creates the database, seven tables with their columns and indexes, and the
-storage bucket. It prints a line per resource.
+Creates the database, seven tables with their columns and indexes, and the
+storage bucket — printing a line per resource. **Safe to run again:** anything
+that already exists is skipped, so it doubles as a migration when you pull a
+version that adds a column.
 
-It is **safe to run again**. Anything that already exists is skipped, so it also
-serves as a migration when you pull a version that adds a column.
+If it says a table's indexes were skipped, wait a minute and run it again.
+Appwrite builds columns asynchronously and an index cannot be created until its
+columns are ready.
 
-If it warns that a table's indexes were skipped, wait a minute and run it again.
-Appwrite builds columns asynchronously, and an index cannot be created until
-every column it covers is ready.
+| Table          | Holds                                                 |
+| -------------- | ----------------------------------------------------- |
+| `books`        | The catalogue. Public read, admin write.              |
+| `users`        | A profile mirror, so admins can see who signed in.    |
+| `progress`     | Where each reader is in each book.                    |
+| `bookmarks`    | Saved positions with an optional note.                |
+| `favorites`    | Kept books.                                           |
+| `highlights`   | Marked passages and their notes.                      |
+| `reading_days` | One row per reader per day, for streaks and the graph. |
 
-### What it creates
+Everything except `books` and `users` has **row security on**, with each row
+written owner-only — so Appwrite itself refuses to let one reader see another's
+bookmarks, rather than it depending on the app getting a query filter right.
 
-| Table          | What it holds                                          |
-| -------------- | ------------------------------------------------------ |
-| `books`        | The catalogue. Public read, admin write.               |
-| `users`        | A profile mirror, so the admin can see who signed in.  |
-| `progress`     | Where each reader is in each book.                     |
-| `bookmarks`    | Saved positions with an optional note.                 |
-| `favorites`    | Kept books.                                            |
-| `highlights`   | Marked passages and their notes.                       |
-| `reading_days` | One row per reader per day, for streaks and the graph.  |
-
-Everything except `books` and `users` has **row security on**, and each row is
-written with owner-only permissions. That means Appwrite itself refuses to let
-one reader see another's bookmarks — it does not depend on the app getting a
-query filter right.
-
-One bucket, `parva_books`, **private**:
-
-- Book files are never public. They reach a reader either through a
-  short-lived signed token or relayed by `/api/book-stream`, depending on
-  whether the API key has `tokens.write`.
-- Covers live in the same bucket and are served through `/api/cover/[id]`, which
-  reads them with the API key — so nothing is publicly listable.
-
-Appwrite Cloud's free plan allows exactly **one bucket per project**, which is
-why covers share it rather than getting their own. Set
-`APPWRITE_COVERS_BUCKET_ID` to a different id on a plan with room, and setup will
-create a separate one.
-
-Note that on a project which already holds books, setting that variable is not
-enough on its own: the existing cover files are physically in the books bucket,
-so the app would start looking for them somewhere they are not. Splitting an
-existing install means moving those files too.
-
-Free plans are also capped at **one database**. If your project already has one,
-setup adopts it instead of failing — Parva's tables are namespaced by their own
-ids and sit alongside anything else in there.
-
-### How large a book can be
-
-This is set by your Appwrite instance, not by Parva:
-
-| Where you run Appwrite | Largest single file    | Total storage |
-| ---------------------- | ---------------------- | ------------- |
-| Cloud — Free           | ~**30 MB** in practice | 2 GB          |
-| Cloud — Pro            | up to **5 GB**         | 150 GB        |
-| Self-hosted            | `_APP_STORAGE_LIMIT`, **30 MB** by default | your disk |
-
-> Appwrite's pricing page lists 50 MB for the free plan, but a real free project
-> rejected 50 and accepted 30. Do not trust a number here — the script probes for
-> the true value and prints it.
-
-`npm run setup` does not guess. It asks for the largest size it can and steps
-down until Appwrite accepts one, then prints what you actually got:
+**File size** is set by your Appwrite instance, not by Parva. Cloud's free plan
+refuses anything over **50,000,000 bytes** (a decimal number — 50 MiB is over
+the line and gets rejected); self-hosted uses `_APP_STORAGE_LIMIT`, 30 MiB by
+default. Setup asks for the largest it can and steps down until one is accepted,
+then prints what you got:
 
 ```
-✓ Bucket "parva_books" (private) — files up to 30 MB
+✓ Bucket "parva_books" (private) — files up to 47.7 MiB (50000000 bytes)
 ```
 
-The upload form then reads that number back off the bucket, so it rejects an
-oversized file immediately with the real limit in the message rather than letting
-the upload run and fail.
-
-**To raise it:** on Cloud, upgrade the plan. Self-hosted, set
-`_APP_STORAGE_LIMIT` (in bytes) in *Appwrite's own* `.env` — the one next to its
-`docker-compose.yml`, not Parva's — and restart it. Either way, delete the
-`parva_books` bucket afterwards and re-run `npm run setup` so it picks up the new
-ceiling; an existing bucket keeps whatever it was created with.
-
-For context: most EPUBs are 1–5 MB and a typical text PDF is 2–20 MB, so 30 MB
-still covers most books. Large scanned or image-heavy PDFs are what run past it.
-
-Free-tier bandwidth is worth a thought too: 5 GB/month is roughly 150 reads of a
-30 MB scan — fine for a private library, tight for a public one. That quota is
-Appwrite's, and it is spent either way, since the bytes leave Appwrite whether
-the reader fetches them directly or they are relayed through the app.
+To raise it later, set `NEXT_PUBLIC_MAX_BOOK_MB` higher and re-run `npm run
+setup` — it will raise an existing bucket, never lower it. On Cloud that means
+upgrading the plan first.
 
 ---
 
 ## 3. Google sign-in
 
-Reading needs no account, so this is only needed for bookmarks, favourites and
-"where you left off". You can skip it and come back.
+**Google Cloud Console** → create an OAuth 2.0 Web client. For the authorised
+redirect URI, use the one **Appwrite shows you** on its Google provider screen —
+it points at Appwrite, not at your app, and does not change between local and
+production.
 
-### In Google Cloud Console
-
-1. Create or pick a project at
-   [console.cloud.google.com](https://console.cloud.google.com).
-2. **APIs & Services → OAuth consent screen.** Fill it in. "External" is fine.
-   While it is in Testing, add your own address under **Test users**.
-3. **APIs & Services → Credentials → Create credentials → OAuth client ID**,
-   type **Web application**.
-4. Under **Authorised redirect URIs**, add the URI Appwrite gives you. It is
-   shown in the Appwrite console when you open the Google provider, and looks
-   like:
-
-   ```
-   https://fra.cloud.appwrite.io/v1/account/sessions/oauth2/callback/google/YOUR_PROJECT_ID
-   ```
-
-   Copy it from Appwrite rather than typing it — the region and project ID both
-   have to match exactly.
-
-5. Copy the **client ID** and **client secret**.
-
-### In Appwrite
-
-**Auth → Settings → Google →** toggle on, paste the client ID and secret, save.
-
-That is all. Parva needs no extra configuration for OAuth; the redirect URLs it
-uses are derived from `NEXT_PUBLIC_SITE_URL`.
-
-> **Deploying?** Set `NEXT_PUBLIC_SITE_URL` to your real origin and add that
-> hostname under **Settings → Platforms** in Appwrite. The Google redirect URI
-> does not change — it points at Appwrite, not at your app.
+**Appwrite** → **Auth → Settings → Google** → toggle on, paste the client ID and
+secret, save.
 
 ---
 
 ## 4. Make yourself an administrator
 
-Administrators are made from the command line, never through the app. There is
-no sign-up form and no "make me an admin" button, which is the point: the admin
-label lives on the Appwrite account and only the API key can set it.
+Admin rights are an `admin` label on the Appwrite account — set server-side
+only, so nobody can grant it to themselves. There is no sign-up form and no
+"make me an admin" button.
 
-**The easy path** — sign in with Google once at `/sign-in`, then:
+1. Sign in once at `/sign-in` so the account exists (Google, or create the user
+   in the console and use **Administrator sign-in**).
+2. Console → **Auth → Users** → select the user → **Labels** → add `admin`.
+3. Sign out and back in for it to take effect.
 
-```bash
-npm run make-admin -- you@example.com "Your Name"
-```
-
-That promotes the account that already exists. Sign out and back in for the
-label to take effect.
-
-**Without Google** — the same command creates an account and prints a generated
-password:
-
-```bash
-npm run make-admin -- you@example.com "Your Name"
-```
-
-Then sign in at `/sign-in` under **Administrator sign-in**. You can set the
-password yourself with `--password "at-least-8-chars"`, and remove admin rights
-with `--demote`.
+Removing the label removes the rights, from the next sign-in.
 
 ---
 
-## Run it
+## 5. Run it
 
 ```bash
 npm run dev
 ```
 
 Open <http://localhost:3000>, go to `/admin/books/new`, and drop a PDF or EPUB
-on the page. Its title, author and cover are read out of the file, so most books
-need nothing else typed. Publish it and it is on the shelf.
+on the page. Title, author and cover are read out of the file, so most books
+need nothing typed.
+
+---
+
+## Scripts
+
+Only two, both in `scripts/`:
+
+| Command             | What it does                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `npm run setup`     | `scripts/setup-appwrite.mjs` — provisions the database, tables, indexes and bucket. Idempotent; also your migration step. |
+| `npm install`       | Runs `scripts/copy-pdf-assets.mjs` via `postinstall` — copies the pdf.js worker, cmaps, fonts and wasm decoders into `public/pdfjs/`. |
+
+`public/pdfjs/` is gitignored because it is generated. **If PDFs stop
+rendering, run `npm install` again** — that directory has to exist locally, and
+a fresh clone has no copy of it.
+
+Both read configuration from `.env` and need `APPWRITE_API_KEY`. Neither stores
+anything.
+
+Other useful commands: `npm run typecheck`, `npm run lint`, `npm run build`.
+
+### The icons
+
+All of them are drawn in code from one place, `src/lib/brand-mark.tsx` — a bold
+"P" on a solid ink square. `app/icon.tsx` (browser tab), `app/apple-icon.tsx`
+(iOS) and `app/icons/[icon]/route.tsx` (the PWA manifest sizes) render it on
+request, so no size can drift from the others and there are no image binaries in
+the repo.
+
+The one exception is `src/app/favicon.ico`, which is a real file because some
+crawlers request `/favicon.ico` directly instead of reading the tag Next emits.
+Editing the mark means regenerating that one by hand.
+
+The mark needs a bold weight, and `next/og` ships only a regular one — it reads
+Liberation Sans Bold out of `public/pdfjs/standard_fonts/`, a file the pdf.js
+copy step already puts there.
 
 ---
 
 ## Deploying
 
-### Vercel
+1. Push to GitHub and import at [vercel.com/new](https://vercel.com/new).
+   Framework detection handles the build; `vercel.json` is already in the repo.
 
-1. Push the repo to GitHub and import it at
-   [vercel.com/new](https://vercel.com/new). Framework detection handles the
-   build settings; `vercel.json` is already in the repo.
+2. Add the `.env` variables, with **`NEXT_PUBLIC_SITE_URL` set to your real
+   domain** (no trailing slash). Do not skip it: `.env` is gitignored and never
+   reaches the host, so a deployment without it falls back to
+   `http://localhost:3000` — which puts localhost into every canonical URL and
+   the sitemap, and sends the Google sign-in redirect to a machine that is not
+   the one signing in. Keep the `.env` copy pointing at localhost; that is what
+   makes sign-in work while developing.
 
-2. Add the environment variables from `.env`, with
-   `NEXT_PUBLIC_SITE_URL` set to your real domain (no trailing slash). Do not
-   skip it: `.env` is gitignored and never reaches the host, so a deployment
-   without this variable falls back to `http://localhost:3000` — which puts
-   localhost into every canonical URL and the sitemap, and sends the Google
-   sign-in redirect to a machine that is not the one signing in. Keep the
-   `.env` copy pointing at localhost; that is what makes sign-in work while
-   developing.
+3. **Add your production hostname** under **Overview → Platforms** in Appwrite.
+   Without it, browser uploads fail with a CORS error and sign-in will not
+   return.
 
-3. Add that domain under **Settings → Platforms** in Appwrite.
+Book files never pass through a serverless function — the browser uploads
+straight to Appwrite and the reader streams straight from it — so a host's
+request body limit is not a constraint on book size. (Uploads under 4 MB do go
+through `/api/admin/upload`; larger ones go direct, because Vercel caps a
+function request body at 4.5 MB.)
 
-Book files never pass through a Vercel function — the browser uploads straight
-to Appwrite, and the reader streams straight from it — so the platform's request
-body limit is not a constraint on how large a book can be.
-
-### Anywhere that runs Node
-
-```bash
-npm ci
-npm run build
-npm start
-```
-
-`npm start` serves on port 3000. Put it behind your usual reverse proxy. Nothing
-in the app requires Vercel.
-
-### Docker
-
-There is no Dockerfile in the repo, because the build is a plain Next.js
-standalone build. If you want one, `node:22-alpine`, `npm ci`, `npm run build`,
-`npm start` is the whole recipe — just remember `npm run postinstall` copies the
-pdf.js assets into `public/`, so run it after `npm ci` if you skip lifecycle
-scripts.
+Anywhere else that runs Node: `npm run build && npm start`, port 3000, same
+environment variables.
 
 ---
 
 ## Troubleshooting
 
 **`Project with the requested ID could not be found`**
-The endpoint and project ID disagree. Appwrite Cloud is region-specific — check
-that `NEXT_PUBLIC_APPWRITE_ENDPOINT` matches the region your project is in.
+Endpoint and project ID disagree — check the region in
+`NEXT_PUBLIC_APPWRITE_ENDPOINT`.
 
 **Setup says the API key was rejected (401)**
-The key is missing a scope. The table above lists all of them; `columns.write`
-and `indexes.write` are the two people usually miss.
-
-**Google sign-in returns to `/sign-in?error=google`**
-Either the hostname is not registered under **Settings → Platforms** in
-Appwrite, or the redirect URI in Google Cloud does not match the one Appwrite
-shows, character for character.
-
-**Google sign-in returns `error=config`**
-The Google provider is not enabled in Appwrite, or its client ID and secret are
-blank.
-
-**A book opens, then fails with "the link may have expired"**
-Signed file URLs last four hours. Reloading mints a new one. If it happens
-immediately, the API key is missing `files.read`.
-
-**Covers do not appear, or a cover upload is rejected**
-The bucket has to accept image types and have transformations enabled. Re-running
-`npm run setup` reconciles both on an existing bucket and says so:
-
-```
-✓ Updated "parva_books" — now accepts jpg, jpeg, png, webp, avif, gif
-```
-
-If it instead reports that covers are separate, `APPWRITE_COVERS_BUCKET_ID` is
-set in `.env`. Blank it unless you really have a second bucket.
+A missing scope. Usually `columns.write` or `indexes.write`.
 
 **Setup says the plan allows no more databases or buckets**
-Not a problem — it adopts the existing database and shares the one bucket. Only
-an error if it also says it could not find *any* database, which means you need
-to create one in the console first.
+Fine — it adopts the existing database and shares the one bucket. Only an error
+if it also cannot find *any* database, in which case create one in the console.
+
+**Upload fails with a CORS error, or 403 with no `Access-Control-Allow-Origin`**
+The site's origin is not registered under **Overview → Platforms** in Appwrite.
+Add it exactly, protocol included.
+
+**Upload fails with 413 / `FUNCTION_PAYLOAD_TOO_LARGE`**
+Vercel refuses request bodies over 4.5 MB. Files above 4 MB are meant to go
+straight to Appwrite instead, which needs the platform registered as above.
+
+**Google sign-in returns to `/sign-in?error=google`**
+Hostname not registered in Appwrite, or the redirect URI in Google Cloud does
+not match Appwrite's, character for character. `error=config` instead means the
+Google provider is off, or its client ID and secret are blank.
+
+**A book opens, then fails with "the link may have expired"**
+Signed URLs last four hours; reloading mints a new one. Immediately, every time,
+means the API key is missing `files.read`.
+
+**Covers do not appear**
+The bucket must accept image types. Re-running `npm run setup` reconciles that
+and says so. If it reports covers are *separate*, `APPWRITE_COVERS_BUCKET_ID` is
+set — blank it unless you really have a second bucket.
 
 **The admin dashboard says the database is not set up**
 `npm run setup` has not run successfully against this project.
 
-**PDFs fail to render after a dependency change**
-`npm run postinstall` copies the pdf.js worker and its wasm decoders into
-`public/pdfjs/`. That directory is gitignored, so it has to exist locally. Run
-`npm install` again.
+**`fetch failed` / `EAI_AGAIN` / `ENOTFOUND` against Appwrite**
+DNS on the machine, not the app or Appwrite. Catalogue reads retry four times
+with a DNS nudge between each, so most of these never reach you — but if the
+error is frequent, check what is answering:
+
+```bash
+node -e "console.log(require('dns').getServers())"
+```
+
+If that prints `127.0.0.1`, something local is proxying DNS — a VPN client, an
+ad-blocker, or antivirus web filtering — and dropping requests intermittently.
+Confirm by comparing:
+
+```bash
+node -e "const d=require('dns');const r=new d.Resolver();r.setServers(['1.1.1.1']);
+r.resolve4('cloud.appwrite.io',(e,a)=>console.log('1.1.1.1:',e?e.code:a.length+' addrs'));
+d.lookup('cloud.appwrite.io',(e,a)=>console.log('system :',e?e.code:'ok'))"
+```
+
+A public resolver answering while the system one fails means the local proxy is
+the problem. Point the adapter's DNS at `1.1.1.1` or `8.8.8.8` (or pause
+whatever is intercepting) and the errors stop. Retrying in the app only hides
+this; it cannot fix a resolver that will not answer.

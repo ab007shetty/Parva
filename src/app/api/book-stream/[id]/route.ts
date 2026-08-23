@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
 import { getPublishedBook } from '@/lib/appwrite/books';
 import { BUCKETS } from '@/lib/config';
 
@@ -28,6 +30,9 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = rateLimitGuard('book-stream', request, RATE.bookFile);
+  if (limited) return limited;
+
   const { id } = await params;
   const wantsDownload = new URL(request.url).searchParams.get('download') === '1';
 

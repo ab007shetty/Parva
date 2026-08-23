@@ -3,21 +3,20 @@ import { BRAND_FONT_FAMILY } from '@/lib/brand-font';
 /**
  * The Parva mark: a single letter on a solid square.
  *
- * An earlier version of this drew an abstract closed book — a spine crease and
- * two page-edge bars, no letterform — on the theory that a fine serif "P"
- * would turn to mud at 16–32 pixels. In practice the abstract version was the
- * one that didn't read: at favicon size it looked like a dark blob rather than
- * anything identifiable as a book. A bold, high-contrast letter on a solid
- * fill is the pattern that actually survives a browser tab (Notion's "N",
- * Slack's hash, Medium's "M") — a heavy sans letterform has none of a serif's
- * fine terminals to lose at small sizes.
+ * An earlier version drew an abstract closed book — a spine crease and two
+ * page-edge bars, no letterform — on the theory that a fine serif "P" would
+ * turn to mud at 16–32 pixels. In practice the abstract version was the one
+ * that didn't read: at favicon size it looked like a dark blob rather than
+ * anything identifiable. A bold, high-contrast letter on a solid fill is the
+ * pattern that actually survives a browser tab (Notion's "N", Medium's "M") —
+ * a heavy sans letterform has none of a serif's fine terminals to lose.
  *
- * Solid ink rather than white, so the mark stays a dark, visible square
- * against both a light and a dark browser tab bar — a white-on-white mark is
- * the specific way the previous one could vanish entirely on an unfocused tab.
+ * Solid ink rather than white, so the mark stays a dark, visible square against
+ * both a light and a dark browser tab bar — a white-on-white mark is the
+ * specific way this could vanish entirely on an unfocused tab.
  *
- * Shared by the favicon, the apple icon and the installable app icons so all
- * of them are the same drawing at different sizes.
+ * Shared by the favicon, the apple icon, the installable app icons and the
+ * share image, so all of them are the same drawing at different sizes.
  */
 export function BrandMark({ size, padded = true }: { size: number; padded?: boolean }) {
   // Maskable icons get clipped to a circle by the platform and the apple icon
@@ -51,9 +50,8 @@ export function BrandMark({ size, padded = true }: { size: number; padded?: bool
           lineHeight: 1,
           color: '#ffffff',
           // A capital letter's ink sits above the baseline with a little air
-          // below it built into the font's own line-height metrics; nudging
-          // up a few percent is what actually centres it optically rather
-          // than by the box math alone.
+          // below it built into the font's own metrics; nudging up a few percent
+          // is what centres it optically rather than by the box math alone.
           transform: 'translateY(-4%)',
         }}
       >

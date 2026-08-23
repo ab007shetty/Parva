@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
 import { getSessionUser } from '@/lib/auth/session';
 import { recordReadingDay, saveProgress } from '@/lib/appwrite/reader-data';
 import { clamp } from '@/lib/utils';
@@ -13,6 +15,9 @@ import { clamp } from '@/lib/utils';
  * their own progress — this route does not have to be trusted for that.
  */
 export async function POST(request: Request) {
+  const limited = rateLimitGuard('progress', request, RATE.readerWrite);
+  if (limited) return limited;
+
   const user = await getSessionUser();
   // Signed-out readers keep their place in localStorage. Not an error.
   if (!user) return NextResponse.json({ ok: false, stored: 'local' }, { status: 200 });

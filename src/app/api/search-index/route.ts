@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { getSearchIndex } from '@/lib/appwrite/books';
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
+import { getCachedSearchIndex } from '@/lib/appwrite/catalogue-cache';
 import { withRetry } from '@/lib/appwrite/server';
 
 /**
@@ -10,13 +12,16 @@ import { withRetry } from '@/lib/appwrite/server';
  */
 export const revalidate = 300;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const limited = rateLimitGuard('search-index', request, RATE.searchIndex);
+  if (limited) return limited;
+
   try {
     // Extra patience on top of the retry inside getSearchIndex, for the same
     // reason the sitemap has it: this route is prerendered at build time, so a
     // network blip during a deploy caches an empty index — and every search in
     // the app then finds nothing until `revalidate` above comes round.
-    const items = await withRetry(() => getSearchIndex(), 4);
+    const items = await withRetry(() => getCachedSearchIndex(), 4);
     return NextResponse.json(
       { items },
       {

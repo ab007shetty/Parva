@@ -70,11 +70,10 @@ export function SignInForm({ next }: { next: string }) {
             onClick={() => setStaffOpen(true)}
             className="link-rule text-[0.75rem] text-graphite hover:text-ink"
           >
-            Administrator sign-in
+            Email sign-in
           </button>
         ) : (
           <form onSubmit={submitStaff} className="space-y-4">
-            <p className="label">Administrator</p>
 
             <Field
               label="Email"

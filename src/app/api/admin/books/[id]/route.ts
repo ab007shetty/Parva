@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { Query } from 'node-appwrite';
 
 import { requireAdmin } from '@/lib/auth/session';
@@ -7,6 +7,7 @@ import { createAdminClient, isConflict, isNotFound } from '@/lib/appwrite/server
 import { BUCKETS, DB_ID, TABLES } from '@/lib/config';
 import { deleteStoredFile } from '@/lib/appwrite/files';
 import { demoteOtherFeatured } from '@/lib/appwrite/books';
+import { CATALOGUE_TAG } from '@/lib/appwrite/catalogue-cache';
 import { clamp, normalizeHex, slugify, uniqueSlug } from '@/lib/utils';
 import type { BookRow } from '@/types';
 
@@ -164,6 +165,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     // Featuring this book unfeatures whatever held the slot before it.
     if (data.featured === true) await demoteOtherFeatured(id);
 
+    // 'max' is the documented profile: the tag is marked stale and refreshed
+    // behind the next visit. updateTag() would be read-your-own-writes, but it
+    // is Server-Action-only and this is a Route Handler.
+    revalidateTag(CATALOGUE_TAG, 'max');
     revalidatePath('/');
     revalidatePath('/library');
     revalidatePath(`/book/${current.slug}`);
@@ -208,6 +213,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     // are owned by their readers, not by this book, and a re-uploaded book
     // under the same id would restore them.
 
+    // 'max' is the documented profile: the tag is marked stale and refreshed
+    // behind the next visit. updateTag() would be read-your-own-writes, but it
+    // is Server-Action-only and this is a Route Handler.
+    revalidateTag(CATALOGUE_TAG, 'max');
     revalidatePath('/');
     revalidatePath('/library');
     revalidatePath(`/book/${book.slug}`);

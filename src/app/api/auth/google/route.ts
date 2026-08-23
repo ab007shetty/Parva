@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
 import { OAuthProvider } from 'node-appwrite';
 
 import { SITE_URL } from '@/lib/config';
@@ -13,6 +15,9 @@ import { createAdminClient } from '@/lib/appwrite/server';
  * store server-side — the session secret never touches client JavaScript.
  */
 export async function GET(request: Request) {
+  const limited = rateLimitGuard('oauth-start', request, RATE.oauthStart);
+  if (limited) return limited;
+
   const requested = new URL(request.url).searchParams.get('next');
 
   // Only ever redirect back inside this app. An absolute URL here would be an

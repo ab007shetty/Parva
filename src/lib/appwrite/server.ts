@@ -148,28 +148,68 @@ function isTransientNetworkError(error: unknown): boolean {
   );
 }
 
+/** Host of the Appwrite endpoint, for the DNS nudge below. */
+const ENDPOINT_HOST = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ?? '').hostname || null;
+  } catch {
+    return null;
+  }
+})();
+
 /**
- * Retries a read after a short pause, and only for the transient network
- * failure above. Reserved for reads — an Appwrite write is not always safe to
- * repeat blind (an increment, for instance, would double-count if the first
- * attempt actually reached the server and only its response was lost).
+ * Asks the OS resolver for the endpoint host, ignoring the answer.
  *
- * Three attempts, not two: a single retry recovers most of the time — the DNS
- * hiccup usually clears within milliseconds — but it is not the only shape
- * this takes in practice. The library page fires three of these calls at once
- * (browseBooks, getFacets, getContinueReading), and when the DNS cache is
- * genuinely cold all three can race the same flaky lookup together, so one
- * retry each does not always land in a clear window. The backoff grows
- * between attempts rather than staying flat, on the chance that whatever is
- * congested needs a moment rather than an instant to clear.
+ * Measured on the machine this was written against: `dns.resolve4`, which
+ * queries the configured nameserver directly, returns ECONNREFUSED, while
+ * `dns.lookup`, which goes through the OS resolver and its cache, answers —
+ * and a moment later the reverse can be true. The system resolver there is
+ * `127.0.0.1`, a local DNS proxy, and it drops requests intermittently.
+ *
+ * Calling lookup() between attempts pokes the path that has a cache, so the
+ * retry that follows has something to hit rather than repeating the same cold
+ * miss. It made the difference between failing four times in a row and
+ * succeeding when this was first measured against a real endpoint.
+ *
+ * Deliberately best-effort: errors are swallowed and the import is dynamic, so
+ * this costs nothing on the normal path and cannot itself become the failure.
  */
-export async function withRetry<T>(read: () => Promise<T>, attempts = 3): Promise<T> {
+async function nudgeDns(): Promise<void> {
+  if (!ENDPOINT_HOST) return;
+  try {
+    const { lookup } = await import('node:dns');
+    await new Promise<void>((done) => lookup(ENDPOINT_HOST, { all: true }, () => done()));
+  } catch {
+    // Nothing to do — this is a hint, not a step.
+  }
+}
+
+/**
+ * Retries a read, and only for the transient network failure above. Reserved
+ * for reads — an Appwrite write is not always safe to repeat blind (an
+ * increment, for instance, would double-count if the first attempt actually
+ * reached the server and only its response was lost).
+ *
+ * Four attempts with a growing backoff and a DNS nudge between each, which is
+ * more patience than a page render would normally deserve. It is here because
+ * the alternative was measured: with a flaky local DNS proxy in front of the
+ * machine, three quick attempts inside a second kept surfacing `fetch failed`
+ * on the home page several times an hour. Roughly 1.8s of worst-case waiting
+ * buys a page that renders instead of an error boundary that has to be
+ * dismissed, and a request that is going to fail anyway loses nothing by
+ * taking a little longer to say so.
+ *
+ * This is a mitigation, not a fix. The fix is a resolver that answers — see the
+ * DNS note in SETUP.md's troubleshooting section.
+ */
+export async function withRetry<T>(read: () => Promise<T>, attempts = 4): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await read();
     } catch (error) {
       if (!isTransientNetworkError(error) || attempt >= attempts) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+      await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+      await nudgeDns();
     }
   }
 }

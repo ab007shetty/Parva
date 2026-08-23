@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { LIMITS as RATE, rateLimitGuard } from '@/lib/rate-limit';
+
 import { getSessionUser } from '@/lib/auth/session';
 import { listFavorites, toggleFavorite } from '@/lib/appwrite/reader-data';
 
@@ -18,6 +20,9 @@ export async function GET() {
 
 /** Toggles, and returns the resulting state so the caller can render it. */
 export async function POST(request: Request) {
+  const limited = rateLimitGuard('favorites', request, RATE.readerWrite);
+  if (limited) return limited;
+
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: 'Sign in to keep favourites.' }, { status: 401 });
 

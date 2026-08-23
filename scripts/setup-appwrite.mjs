@@ -755,8 +755,8 @@ async function main() {
        Google OAuth client ID and secret.
     2. Console → Auth → Settings → Platforms → add a Web platform for
        your domain (and localhost for development).
-    3. Create your administrator:
-         npm run make-admin -- you@example.com "Your Name"
+    3. Sign in once, then Console -> Auth -> Users -> your user ->
+       Labels -> add "admin".
     4. npm run dev
 
   Full walkthrough in SETUP.md.
