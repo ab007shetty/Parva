@@ -80,28 +80,28 @@ export default async function AdminBooksPage({
 
       {books.length ? (
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[46rem] border-collapse text-left">
+          <table className="w-full border-collapse text-left lg:min-w-[46rem]">
             <thead>
               <tr className="border-b border-rule">
                 <th scope="col" className="label py-3 pr-4">
                   Book
                 </th>
-                <th scope="col" className="label py-3 pr-4">
+                <th scope="col" className="label hidden py-3 pr-4 sm:table-cell">
                   Format
                 </th>
-                <th scope="col" className="label py-3 pr-4">
+                <th scope="col" className="label hidden py-3 pr-4 lg:table-cell">
                   Size
                 </th>
-                <th scope="col" className="label py-3 pr-4 text-right">
+                <th scope="col" className="label hidden py-3 pr-4 text-right lg:table-cell">
                   Opens
                 </th>
                 <th scope="col" className="label py-3 pr-4">
                   Status
                 </th>
-                <th scope="col" className="label py-3 pr-4">
+                <th scope="col" className="label hidden py-3 pr-4 md:table-cell">
                   Added
                 </th>
-                <th scope="col" className="label py-3">
+                <th scope="col" className="label hidden py-3 sm:table-cell">
                   <span className="sr-only">Open</span>
                 </th>
               </tr>
@@ -118,21 +118,21 @@ export default async function AdminBooksPage({
                         width={28}
                         className="h-10 w-7"
                       />
-                      <span className="min-w-0">
-                        <span className="block max-w-[22rem] truncate text-[0.875rem] text-ink">
+                      <span className="min-w-0 flex-1">
+                        <span className="block max-w-[8rem] truncate text-[0.875rem] text-ink sm:max-w-[22rem]">
                           {book.title}
                         </span>
-                        <span className="block max-w-[22rem] truncate text-[0.75rem] text-graphite">
+                        <span className="block max-w-[8rem] truncate text-[0.75rem] text-graphite sm:max-w-[22rem]">
                           {(book.authors ?? []).join(', ') || 'Unknown author'}
                         </span>
                       </span>
                     </Link>
                   </td>
-                  <td className="py-3 pr-4 text-[0.75rem] text-graphite uppercase">{book.format}</td>
-                  <td className="py-3 pr-4 text-[0.75rem] text-graphite tnum">
+                  <td className="hidden py-3 pr-4 text-[0.75rem] text-graphite uppercase sm:table-cell">{book.format}</td>
+                  <td className="hidden py-3 pr-4 text-[0.75rem] text-graphite tnum lg:table-cell">
                     {formatBytes(book.fileSize)}
                   </td>
-                  <td className="py-3 pr-4 text-right text-[0.75rem] text-graphite tnum">
+                  <td className="hidden py-3 pr-4 text-right text-[0.75rem] text-graphite tnum lg:table-cell">
                     {book.readCount ?? 0}
                   </td>
                   <td className="py-3 pr-4">
@@ -148,8 +148,8 @@ export default async function AdminBooksPage({
                     </span>
                     {book.featured && <span className="label ml-2">Featured</span>}
                   </td>
-                  <td className="py-3 pr-4 text-[0.75rem] text-mute">{formatRelative(book.$createdAt)}</td>
-                  <td className="py-3">
+                  <td className="hidden py-3 pr-4 text-[0.75rem] text-mute md:table-cell">{formatRelative(book.$createdAt)}</td>
+                  <td className="hidden py-3 sm:table-cell">
                     <div className="flex items-center gap-1">
                       <Link
                         href={`/admin/books/${book.$id}`}

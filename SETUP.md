@@ -266,7 +266,13 @@ need nothing else typed. Publish it and it is on the shelf.
    build settings; `vercel.json` is already in the repo.
 
 2. Add the environment variables from `.env`, with
-   `NEXT_PUBLIC_SITE_URL` set to your real domain (no trailing slash).
+   `NEXT_PUBLIC_SITE_URL` set to your real domain (no trailing slash). Do not
+   skip it: `.env` is gitignored and never reaches the host, so a deployment
+   without this variable falls back to `http://localhost:3000` — which puts
+   localhost into every canonical URL and the sitemap, and sends the Google
+   sign-in redirect to a machine that is not the one signing in. Keep the
+   `.env` copy pointing at localhost; that is what makes sign-in work while
+   developing.
 
 3. Add that domain under **Settings → Platforms** in Appwrite.
 

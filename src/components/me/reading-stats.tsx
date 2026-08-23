@@ -36,17 +36,29 @@ export function ReadingStats({
 
   return (
     <section aria-label="Your reading">
-      <dl className="grid gap-px border border-rule bg-rule sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <div key={stat.label} className="bg-paper p-5">
-            <dt className="label">{stat.label}</dt>
-            <dd className="display mt-2.5 text-[1.75rem] tnum">{stat.value}</dd>
-            {stat.hint && <p className="mt-1 text-[0.625rem] text-mute">{stat.hint}</p>}
-          </div>
-        ))}
-      </dl>
+      {/* One row from xl up: the four numbers, then the half-year strip beside
+          them. The strip is a fixed ~312px of squares, so stacked below the
+          stats it left a wide band of empty page to its right on any desktop —
+          and made the four cards, already stretched across the full gutter
+          width, wider still. Side by side, the strip fills that band and takes
+          the cards down to a sane measure.
 
-      {days.length > 0 && <ReadingYear days={days} />}
+          xl rather than lg: at 1024px, four cards sharing what is left after
+          312px of strip come out around 144px each, which is narrower than the
+          "TIME READING" label they have to hold. */}
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-10">
+        <dl className="grid gap-px border border-rule bg-rule sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="bg-paper p-5">
+              <dt className="label">{stat.label}</dt>
+              <dd className="display mt-2.5 text-[1.75rem] tnum">{stat.value}</dd>
+              {stat.hint && <p className="mt-1 text-[0.625rem] text-mute">{stat.hint}</p>}
+            </div>
+          ))}
+        </dl>
+
+        {days.length > 0 && <ReadingYear days={days} />}
+      </div>
     </section>
   );
 }
@@ -89,8 +101,10 @@ function ReadingYear({ days }: { days: ReadingDayRow[] }) {
     return 'bg-ink';
   }
 
+  // No top margin of its own: the parent grid's gap sets the spacing, whether
+  // this sits below the stats or beside them.
   return (
-    <div className="mt-8">
+    <div>
       <p className="label mb-3.5">Reading days</p>
 
       {/* Scrolls rather than shrinking: legible squares matter more than fitting

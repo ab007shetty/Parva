@@ -26,6 +26,17 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  /**
+   * Dismisses the mobile panel.
+   *
+   * Every control in this header that navigates or opens something else has to
+   * call this. Route changes are not enough on their own: tapping the wordmark
+   * while already on the home page, or a nav link for the page you are on,
+   * leaves the pathname untouched and would strand the panel open over the
+   * content.
+   */
+  const close = () => setOpen(false);
+
   // The reader is full-screen and owns its own chrome.
   if (pathname?.startsWith('/read/')) return null;
 
@@ -34,6 +45,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
       <div className="flex h-16 items-center gap-4 px-[var(--page-gutter)] sm:h-[4.5rem]">
         <Link
           href="/"
+          onClick={close}
           className="display-tight shrink-0 text-[1.5rem] tracking-[-0.04em] sm:text-[1.75rem]"
           aria-label={`${APP_NAME} home`}
         >
@@ -64,7 +76,10 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
               navigation. The visible shortcut teaches the keyboard path. */}
           <button
             type="button"
-            onClick={() => openCommandPalette()}
+            onClick={() => {
+              close();
+              openCommandPalette();
+            }}
             className="flex h-9 items-center gap-2.5 border border-rule px-3 text-[0.8125rem] text-graphite transition-colors hover:border-ink hover:text-ink"
           >
             <Search className="size-3.5" strokeWidth={1.5} />
@@ -99,7 +114,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
                 href={item.href}
                 // Closing on click rather than on route change also covers
                 // tapping the page you are already on.
-                onClick={() => setOpen(false)}
+                onClick={close}
                 className="display border-b border-rule-soft py-3 text-[1.375rem]"
               >
                 {item.label}
@@ -107,7 +122,7 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
             ))}
           </nav>
           <div className="mt-6">
-            <UserMenu user={user} stacked />
+            <UserMenu user={user} stacked onNavigate={close} />
           </div>
         </div>
       )}

@@ -17,7 +17,25 @@ function initials(name: string) {
   return `${parts[0]![0]}${parts.at(-1)![0]}`.toUpperCase();
 }
 
-export function UserMenu({ user, stacked = false }: { user: SessionUser | null; stacked?: boolean }) {
+export function UserMenu({
+  user,
+  stacked = false,
+  onNavigate,
+}: {
+  user: SessionUser | null;
+  stacked?: boolean;
+  /**
+   * Called when a link in here is followed. Only the stacked form needs it:
+   * that one lives inside the header's mobile panel, which owns its own open
+   * state and has no way to know a link below it was tapped. The dropdown form
+   * closes itself.
+   *
+   * On click rather than on route change, matching the nav links beside it —
+   * tapping through to the page you are already on still has to close the
+   * panel, and a pathname that never changes would not fire.
+   */
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -46,6 +64,7 @@ export function UserMenu({ user, stacked = false }: { user: SessionUser | null; 
         href={`/sign-in?next=${encodeURIComponent(pathname ?? '/')}`}
         variant="outline"
         size="sm"
+        onClick={onNavigate}
         className={stacked ? 'w-full' : undefined}
       >
         Sign in
@@ -63,7 +82,7 @@ export function UserMenu({ user, stacked = false }: { user: SessionUser | null; 
             <p className="truncate text-[0.75rem] text-graphite">{user.email}</p>
           </div>
         </div>
-        <MenuLinks isAdmin={user.isAdmin} />
+        <MenuLinks isAdmin={user.isAdmin} onNavigate={onNavigate} />
         <SignOutButton className="w-full justify-start px-0" />
       </div>
     );

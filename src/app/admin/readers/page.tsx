@@ -60,7 +60,7 @@ export default async function AdminReadersPage() {
 
       {readers.length ? (
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[34rem] border-collapse text-left">
+          <table className="w-full border-collapse text-left lg:min-w-[34rem]">
             <thead>
               <tr className="border-b border-rule">
                 <th scope="col" className="label py-3 pr-4">
@@ -72,7 +72,7 @@ export default async function AdminReadersPage() {
                 <th scope="col" className="label py-3 pr-4">
                   Last seen
                 </th>
-                <th scope="col" className="label py-3">
+                <th scope="col" className="label hidden py-3 md:table-cell">
                   Joined
                 </th>
               </tr>
@@ -88,14 +88,14 @@ export default async function AdminReadersPage() {
                       >
                         {initials(reader.name)}
                       </span>
-                      <span className="truncate text-[0.875rem]">{reader.name || 'Reader'}</span>
+                      <span className="min-w-0 truncate text-[0.875rem]">{reader.name || 'Reader'}</span>
                     </div>
                   </td>
-                  <td className="py-3 pr-4 text-[0.8125rem] text-graphite">{reader.email}</td>
+                  <td className="max-w-[9rem] truncate py-3 pr-4 text-[0.8125rem] text-graphite sm:max-w-none">{reader.email}</td>
                   <td className="py-3 pr-4 text-[0.75rem] text-graphite">
                     {formatRelative(reader.lastSeenAt)}
                   </td>
-                  <td className="py-3 text-[0.75rem] text-mute">{formatRelative(reader.$createdAt)}</td>
+                  <td className="hidden py-3 text-[0.75rem] text-mute md:table-cell">{formatRelative(reader.$createdAt)}</td>
                 </tr>
               ))}
             </tbody>

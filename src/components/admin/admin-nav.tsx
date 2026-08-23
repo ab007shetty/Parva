@@ -20,11 +20,17 @@ export function AdminNav() {
       {LINKS.map((link) => {
         // /admin must not light up for every child route, but /admin/books
         // should stay lit while editing a book under it.
+        //
+        // The edit-page pattern deliberately excludes "new". /admin/books/new
+        // is its own nav entry, not a book id, yet it matches the shape of one
+        // — so a bare [^/]+ lit up both "Books" and "Add a book" at once on
+        // the page where the distinction matters most.
         const active =
           link.href === '/admin'
             ? pathname === '/admin'
             : link.href === '/admin/books'
-              ? pathname === '/admin/books' || /^\/admin\/books\/[^/]+$/.test(pathname ?? '')
+              ? pathname === '/admin/books' ||
+                /^\/admin\/books\/(?!new$)[^/]+$/.test(pathname ?? '')
               : pathname === link.href;
 
         return (

@@ -85,9 +85,14 @@ export const SESSION_COOKIE = 'parva_session';
 /* ── Limits ─────────────────────────────────────────────────────────── */
 
 export const LIMITS = {
-  /** Appwrite Cloud's own per-file ceiling on the free plan is lower; this is
-   *  the app's ceiling. The setup script applies the same number to the bucket. */
-  bookFileBytes: 200 * 1024 * 1024,
+  /**
+   * Fallback ceiling, used only until /api/admin/limits reports what the
+   * bucket really allows. Appwrite Cloud's free plan refuses anything over
+   * 50,000,000 bytes — a decimal number, not 50 MiB — so that is the honest
+   * default. It was 200 MiB, which meant the upload form would happily accept
+   * a 120 MB book and let Appwrite reject it at the end of the transfer.
+   */
+  bookFileBytes: 50_000_000,
   coverFileBytes: 8 * 1024 * 1024,
   /** Appwrite rejects list queries above 100 per page. */
   pageSize: 24,

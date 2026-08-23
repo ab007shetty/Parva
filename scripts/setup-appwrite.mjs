@@ -77,22 +77,33 @@ const ADMIN_LABEL = 'admin';
 /**
  * Appwrite refuses a bucket whose maximumFileSize exceeds what the instance
  * allows, and that ceiling varies a lot: Appwrite Cloud's free plan caps a
- * single file at 50 MB, Pro at 5 GB, and a self-hosted instance at whatever
- * `_APP_STORAGE_LIMIT` says (30 MB out of the box).
+ * single file at 50,000,000 bytes, Pro much higher, and a self-hosted instance
+ * at whatever `_APP_STORAGE_LIMIT` says (30 MiB out of the box).
  *
  * Rather than hardcode a number that fails on most installs, the bucket is
  * created at the largest of these the instance will accept, and the effective
  * value is printed so it can be raised deliberately.
+ *
+ * The rungs are byte counts rather than "MB × 1024 × 1024", and that is the
+ * whole point of this list. Cloud's ceiling is decimal — 50,000,000 — so a
+ * rung computed as 50 MiB is 52,428,800, which Appwrite rejects outright with
+ * "Value must be a valid range between 1 and 50,000,000". An earlier version
+ * of this ladder did exactly that, so the 50 rung could never succeed and
+ * every free-plan install silently settled on the 30 MiB rung below it,
+ * roughly 18 MB short of what the plan actually allows.
  */
 const REQUESTED_BOOK_MB = Number(process.env.NEXT_PUBLIC_MAX_BOOK_MB) || 0;
+const MIB = 1024 * 1024;
 
-const BOOK_SIZE_LADDER_MB = [
+const BOOK_SIZE_LADDER_BYTES = [
   // An explicit request goes first, whatever its size. Sorting the whole list
   // would bury it — asking for 50 would still try 2 GB first and waste four
   // rejected calls getting back down to it.
-  ...(REQUESTED_BOOK_MB > 0 ? [REQUESTED_BOOK_MB] : []),
-  ...[2048, 512, 200, 100, 50, 30, 10].sort((a, b) => b - a),
-].filter((mb, i, all) => all.indexOf(mb) === i);
+  ...(REQUESTED_BOOK_MB > 0 ? [REQUESTED_BOOK_MB * MIB] : []),
+  ...[2048 * MIB, 512 * MIB, 200 * MIB, 100 * MIB, 50_000_000, 30 * MIB, 10 * MIB].sort(
+    (a, b) => b - a,
+  ),
+].filter((bytes, i, all) => all.indexOf(bytes) === i);
 
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
 
@@ -511,8 +522,48 @@ async function createBooksBucket() {
      rejected file size unless you look first. */
   try {
     const existing = await storage.getBucket({ bucketId: BOOKS_BUCKET });
-    const existingMb = Math.round(existing.maximumFileSize / (1024 * 1024));
-    skip(`Bucket "${BOOKS_BUCKET}" — already there, files up to ${existingMb} MB`);
+    const existingMib = (existing.maximumFileSize / (1024 * 1024)).toFixed(1);
+    skip(
+      `Bucket "${BOOKS_BUCKET}" — already there, files up to ${existingMib} MiB (${existing.maximumFileSize} bytes)`,
+    );
+
+    /* Raise the ceiling if this run asks for more than the bucket allows.
+       Without this, the size is fixed forever at whatever the very first run
+       happened to get: bumping NEXT_PUBLIC_MAX_BOOK_MB and re-running would
+       print "already there" and change nothing, which is a confusing way to
+       discover that an existing install cannot grow. Only ever upward — a
+       lower request is treated as "leave it alone" rather than as an
+       instruction to shrink a bucket that already holds larger books. */
+    let effectiveSize = existing.maximumFileSize;
+
+    // Driven by an explicit NEXT_PUBLIC_MAX_BOOK_MB, not by the whole ladder.
+    // Probing every rung above the current size would mean four rejected calls
+    // on every run of a bucket that is already at its instance's ceiling, to
+    // discover nothing. An explicit request is the only reason to try.
+    const requestedBytes = REQUESTED_BOOK_MB > 0 ? REQUESTED_BOOK_MB * MIB : 0;
+    const wanted =
+      requestedBytes > existing.maximumFileSize
+        ? BOOK_SIZE_LADDER_BYTES.filter(
+            (bytes) => bytes > existing.maximumFileSize && bytes <= requestedBytes,
+          )
+        : [];
+
+    for (const bytes of wanted) {
+      try {
+        await storage.updateBucket({
+          bucketId: BOOKS_BUCKET,
+          name: existing.name,
+          maximumFileSize: bytes,
+          allowedFileExtensions: existing.allowedFileExtensions,
+        });
+        effectiveSize = bytes;
+        ok(`Raised "${BOOKS_BUCKET}" to ${(bytes / (1024 * 1024)).toFixed(1)} MiB (${bytes} bytes)`);
+        break;
+      } catch (error) {
+        if (error?.code !== 400) throw error;
+        await breathe();
+      }
+    }
 
     // Reconcile it. A bucket made by an earlier version accepted only
     // pdf/epub, which would silently reject every cover.
@@ -526,7 +577,7 @@ async function createBooksBucket() {
         permissions: existing.$permissions,
         fileSecurity: existing.fileSecurity,
         enabled: existing.enabled,
-        maximumFileSize: existing.maximumFileSize,
+        maximumFileSize: effectiveSize,
         allowedFileExtensions: [...new Set([...allowed, ...wantedExtensions])],
         compression: existing.compression,
         encryption: existing.encryption,
@@ -536,7 +587,7 @@ async function createBooksBucket() {
       ok(`Updated "${BOOKS_BUCKET}" — now accepts ${missing.join(", ") || "transforms"}`);
     }
 
-    return existing.maximumFileSize;
+    return effectiveSize;
   } catch (error) {
     if (!isMissing(error)) throw error;
     // Genuinely absent. Create it below.
@@ -562,11 +613,11 @@ async function createBooksBucket() {
     transformations: true,
   };
 
-  for (const mb of BOOK_SIZE_LADDER_MB) {
-    const bytes = mb * 1024 * 1024;
+  for (const bytes of BOOK_SIZE_LADDER_BYTES) {
+    const mb = (bytes / (1024 * 1024)).toFixed(bytes % (1024 * 1024) === 0 ? 0 : 1);
     try {
       await storage.createBucket({ ...settings, maximumFileSize: bytes });
-      ok(`Bucket "${BOOKS_BUCKET}" (private) — files up to ${mb} MB`);
+      ok(`Bucket "${BOOKS_BUCKET}" (private) — files up to ${mb} MiB (${bytes} bytes)`);
       return bytes;
     } catch (error) {
       // Order matters: a quota error also mentions "limit", so it has to be
@@ -578,13 +629,13 @@ async function createBooksBucket() {
       }
       if (error?.code !== 400) throw error;
 
-      warn(`${mb} MB is above this instance's file-size limit — trying smaller`);
+      warn(`${mb} MiB is above this instance's file-size limit — trying smaller`);
       await breathe();
     }
   }
 
   throw new Error(
-    'Appwrite rejected every file size down to 10 MB. Check _APP_STORAGE_LIMIT, or that storage is enabled for this project.',
+    'Appwrite rejected every file size down to 10 MiB. Check _APP_STORAGE_LIMIT, or that storage is enabled for this project.',
   );
 }
 

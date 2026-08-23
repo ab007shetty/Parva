@@ -43,7 +43,22 @@ export function Hero({ book }: { book: Book }) {
     () => {
       const mm = gsap.matchMedia();
 
-      mm.add('(prefers-reduced-motion: no-preference)', () => {
+      mm.add(
+        {
+          motion: '(prefers-reduced-motion: no-preference)',
+          // 64rem is Tailwind's `lg` — the exact width at which the grid below
+          // stops stacking and puts the book beside the quote. The reveal order
+          // has to follow the layout, so it reads from the same number.
+          sideBySide: '(min-width: 64rem)',
+        },
+        (context) => {
+        const { motion, sideBySide } = context.conditions as {
+          motion: boolean;
+          sideBySide: boolean;
+        };
+        // Reduced motion is handled by its own branch below.
+        if (!motion) return;
+
         let split: SplitText | undefined;
         let tl: gsap.core.Timeline | undefined;
         let cancelled = false;
@@ -65,13 +80,26 @@ export function Hero({ book }: { book: Book }) {
 
           tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
 
-          tl.fromTo(split.lines, { yPercent: 108 }, { yPercent: 0, duration: 1, stagger: 0.08 })
-            .fromTo(
-              '[data-hero-book]',
-              { opacity: 0, y: 44, rotateY: -14, rotateX: 4 },
-              { opacity: 1, y: 0, rotateY: -7, rotateX: 1, duration: 1.15, ease: 'power3.out' },
-              '-=0.85',
-            )
+          const BOOK_FROM = { opacity: 0, y: 44, rotateY: -14, rotateX: 4 };
+          const BOOK_TO = {
+            opacity: 1,
+            y: 0,
+            rotateY: -7,
+            rotateX: 1,
+            duration: 1.15,
+            ease: 'power3.out',
+          };
+
+          tl.fromTo(split.lines, { yPercent: 108 }, { yPercent: 0, duration: 1, stagger: 0.08 });
+
+          // Side by side, the book rises *with* the quote: they occupy the same
+          // band of the page and arriving together is what makes it read as one
+          // composition rather than two separate reveals.
+          if (sideBySide) {
+            tl.fromTo('[data-hero-book]', BOOK_FROM, BOOK_TO, '-=0.85');
+          }
+
+          tl
             // The rule draws from the left, the way every shelf rule in the app
             // does, and closes the quote before the name under it.
             .fromTo(
@@ -90,6 +118,16 @@ export function Hero({ book }: { book: Book }) {
               { opacity: 1, y: 0, duration: 0.5, stagger: 0.08 },
               '-=0.25',
             );
+
+          // Stacked, the same overlap reads as a bug: the book sits *below* the
+          // buttons, so revealing it early fills the bottom of the screen while
+          // the space above it is still blank, and the page appears to load
+          // backwards. Here it goes last, after the quote, rule, attribution and
+          // buttons have all arrived — a light overlap only, so it follows the
+          // text rather than waiting on a visible beat of nothing.
+          if (!sideBySide) {
+            tl.fromTo('[data-hero-book]', BOOK_FROM, BOOK_TO, '-=0.2');
+          }
         });
 
         return () => {
@@ -99,7 +137,8 @@ export function Hero({ book }: { book: Book }) {
           // unaffected by the split.
           split?.revert();
         };
-      });
+        },
+      );
 
       mm.add('(prefers-reduced-motion: reduce)', () => {
         gsap.set(

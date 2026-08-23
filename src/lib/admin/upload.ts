@@ -78,19 +78,38 @@ const CHUNK_SIZE = 5 * 1024 * 1024;
  *      but a failure here is opaque by construction: Appwrite omits CORS headers
  *      on its 401, so the browser can never read the reason.
  */
+/**
+ * The largest body worth offering our own route.
+ *
+ * A Vercel serverless function rejects a request body over 4.5 MB with a 413
+ * before any of our code runs, and that limit is not configurable. Trying the
+ * proxy anyway used to mean pushing an entire 13 MB book up to the host, being
+ * refused, and only then starting the real upload over — the whole transfer
+ * paid for twice, which on a slow connection is minutes of apparent progress
+ * that achieves nothing. Anything near the ceiling now goes straight to
+ * Appwrite, and the proxy keeps the small files it can actually serve.
+ */
+const HOST_BODY_LIMIT = 4 * 1024 * 1024;
+
 export async function uploadFile(
   credentials: UploadCredentials,
   kind: 'book' | 'cover',
   file: File,
   onProgress?: (percent: number) => void,
 ): Promise<UploadResult> {
+  const bucketId = kind === 'cover' ? credentials.buckets.covers : credentials.buckets.books;
+
+  if (file.size > HOST_BODY_LIMIT) {
+    return uploadDirectToAppwrite(credentials, bucketId, file, onProgress);
+  }
+
   try {
     return await uploadViaServer(file, kind, onProgress);
   } catch (error) {
     if (!(error instanceof BodyTooLargeError)) throw error;
-    // The host will not carry a body this size. Nothing for it but to go direct.
+    // Small enough that it should have fit, but the host refused it anyway —
+    // a stricter platform than the limit above assumes. Go direct.
     onProgress?.(0);
-    const bucketId = kind === 'cover' ? credentials.buckets.covers : credentials.buckets.books;
     return uploadDirectToAppwrite(credentials, bucketId, file, onProgress);
   }
 }
@@ -185,13 +204,26 @@ async function uploadDirectToAppwrite(
   };
 
   async function send(body: FormData, extra: Record<string, string> = {}) {
-    const response = await fetch(url, {
-      method: 'POST',
-      // The whole point: no ambient cookies.
-      credentials: 'omit',
-      headers: { ...baseHeaders, ...extra },
-      body,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        // The whole point: no ambient cookies.
+        credentials: 'omit',
+        headers: { ...baseHeaders, ...extra },
+        body,
+      });
+    } catch (cause) {
+      // A browser blocked by CORS never gives us a response to read a status
+      // from — fetch just rejects with an opaque TypeError, and the console
+      // shows "No 'Access-Control-Allow-Origin' header". Appwrite only sends
+      // that header for origins registered as a Web Platform, so a deployment
+      // to a new domain fails here on its very first upload while localhost
+      // has always worked. That is worth naming outright: the raw message
+      // sends people hunting through their own code for a bug that is one
+      // checkbox in a console.
+      throw new Error(unreachableAppwriteMessage(endpoint), { cause });
+    }
 
     const payload = await response.json().catch(() => null);
 
@@ -247,6 +279,22 @@ async function uploadDirectToAppwrite(
 }
 
 /** Turns Appwrite's upload failures into something a librarian can act on. */
+/**
+ * What to say when the browser could not reach Appwrite at all.
+ *
+ * Names the current origin, because the fix is to register exactly that string
+ * — protocol and all — and a guess at it is what makes this take three tries.
+ */
+function unreachableAppwriteMessage(endpoint: string): string {
+  const origin = typeof window === 'undefined' ? 'this site' : window.location.origin;
+  return (
+    `The browser could not reach Appwrite at ${endpoint}. ` +
+    `If this site was just deployed, add "${origin}" as a Web platform in the Appwrite console ` +
+    `(Overview → Platforms → Add platform → Web) — Appwrite blocks browser requests from ` +
+    `origins it does not know. Otherwise check the connection and try again.`
+  );
+}
+
 function describeUploadError(status: number, payload: unknown): string {
   const message =
     payload && typeof payload === 'object' && 'message' in payload
