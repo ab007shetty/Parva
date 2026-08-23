@@ -17,6 +17,9 @@ const ERRORS: Record<string, string> = {
   incomplete: 'Google did not send everything needed to finish signing in. Try once more.',
   exchange: 'That sign-in could not be completed. Try again in a moment.',
   config: 'Sign-in is not configured yet. An administrator needs to enable Google in Appwrite.',
+  origin:
+    'Appwrite refused the sign-in redirect for this domain. An administrator needs to add it ' +
+    'under Overview → Platforms in the Appwrite console.',
 };
 
 export default async function SignInPage({

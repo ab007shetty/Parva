@@ -41,9 +41,28 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
-    console.error('[parva] could not start Google sign-in', error);
+    /*
+     * Two very different failures used to land here as one "config" code, and
+     * the message it showed — "enable Google in Appwrite" — sent people to a
+     * screen that was already correct.
+     *
+     * Appwrite answers 400 "Invalid redirect" when the success/failure URLs are
+     * not on a hostname registered under Overview -> Platforms. That is a
+     * platform registration problem, and it is the one that happens on every
+     * first deploy to a new domain, because the URLs suddenly change from
+     * localhost to something Appwrite has never been told about. Anything else
+     * really is the provider being off or missing its credentials.
+     */
+    const message = String((error as { message?: string } | null)?.message ?? '');
+    const code = /invalid redirect/i.test(message) ? 'origin' : 'config';
+
+    console.error(
+      `[parva] could not start Google sign-in (${code}) — success URL was ${SITE_URL}`,
+      error,
+    );
+
     const url = new URL('/sign-in', SITE_URL);
-    url.searchParams.set('error', 'config');
+    url.searchParams.set('error', code);
     return NextResponse.redirect(url);
   }
 }

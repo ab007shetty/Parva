@@ -233,10 +233,16 @@ Add it exactly, protocol included.
 Vercel refuses request bodies over 4.5 MB. Files above 4 MB are meant to go
 straight to Appwrite instead, which needs the platform registered as above.
 
-**Google sign-in returns to `/sign-in?error=google`**
-Hostname not registered in Appwrite, or the redirect URI in Google Cloud does
-not match Appwrite's, character for character. `error=config` instead means the
-Google provider is off, or its client ID and secret are blank.
+**Google sign-in returns to `/sign-in?error=origin`**
+Appwrite rejected the redirect with 400 "Invalid redirect" — the site's hostname
+is not registered under **Overview → Platforms**. This is the one that bites on
+a first deploy: the redirect URLs change from `localhost` to a domain Appwrite
+has never been told about. Google Cloud is not involved and does not need
+changing; Appwrite refuses before Google is ever reached.
+
+**`?error=config`** means the Google provider really is off in Appwrite, or its
+client ID and secret are blank. **`?error=google`** means Google itself refused
+or the visitor cancelled.
 
 **A book opens, then fails with "the link may have expired"**
 Signed URLs last four hours; reloading mints a new one. Immediately, every time,
