@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { SITE_URL } from '@/lib/config';
 import { createAdminClient } from '@/lib/appwrite/server';
+import { fetchGoogleAvatarUrl } from '@/lib/auth/google-profile';
 import { setSessionCookie, toSessionUser, upsertUserProfile } from '@/lib/auth/session';
 
 /**
@@ -30,12 +31,35 @@ export async function GET(request: Request) {
 
     await setSessionCookie(session.secret, session.expire);
 
-    // Mirror the profile so the admin can see who signed in and when. Avatars
-    // are rendered as initials in the UI rather than fetched from Google, which
-    // keeps sign-in to a single round-trip and avoids a third-party image
-    // request on every page.
     const user = await users.get({ userId });
-    await upsertUserProfile(toSessionUser(user));
+    const profile = toSessionUser(user);
+
+    /*
+     * Appwrite passes on the name and email but not the picture, so this is the
+     * one place it can be had: the session carries Google's own access token,
+     * good for a single userinfo call. Done here rather than on a page render —
+     * an avatar is worth one request at sign-in, not one per view.
+     *
+     * Stored in the account's prefs so it survives as part of the account
+     * rather than only in the mirror row, which is also where toSessionUser()
+     * already looks for it. Existing prefs are spread back in: updatePrefs
+     * replaces the whole object, so writing only avatarUrl would silently drop
+     * any other preference the account holds.
+     */
+    const avatarUrl = await fetchGoogleAvatarUrl(session.providerAccessToken);
+
+    if (avatarUrl && avatarUrl !== profile.avatarUrl) {
+      try {
+        await users.updatePrefs({ userId, prefs: { ...(user.prefs ?? {}), avatarUrl } });
+        profile.avatarUrl = avatarUrl;
+      } catch (error) {
+        // A missing picture is cosmetic; it must not cost anyone their sign-in.
+        console.error('[parva] could not store the Google avatar', error);
+      }
+    }
+
+    // Mirror the profile so the admin can see who signed in and when.
+    await upsertUserProfile(profile);
 
     return NextResponse.redirect(new URL(next, SITE_URL));
   } catch (error) {

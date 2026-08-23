@@ -120,12 +120,40 @@ export function UserMenu({
   );
 }
 
+/**
+ * The reader's Google picture when there is one, their initials when there is
+ * not — which stays the common case, since only Google sign-ins have a picture
+ * and an administrator created with email and password never will.
+ *
+ * A plain <img>, not next/image: this is one 32px avatar from a host we do not
+ * control, so the optimiser has nothing to add and an allow-list entry for
+ * googleusercontent.com would be a config change for a single element. The URL
+ * is validated against that host when it is stored (see lib/auth/google-profile).
+ */
 function Avatar({ user }: { user: SessionUser }) {
+  const base =
+    'grid size-8 shrink-0 place-items-center overflow-hidden border border-rule bg-wash text-[0.6875rem] font-semibold tracking-[0.04em] text-ink';
+
+  if (user.avatarUrl) {
+    return (
+      <span className={base} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={user.avatarUrl}
+          alt=""
+          width={32}
+          height={32}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          className="size-full object-cover"
+        />
+      </span>
+    );
+  }
+
   return (
-    <span
-      className="grid size-8 shrink-0 place-items-center border border-rule bg-wash text-[0.6875rem] font-semibold tracking-[0.04em] text-ink"
-      aria-hidden="true"
-    >
+    <span className={base} aria-hidden="true">
       {initials(user.name)}
     </span>
   );
